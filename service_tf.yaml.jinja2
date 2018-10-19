@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: {{ labels_name }}
+    role: {{ labels_role }}
+  name: {{ name }}
+spec:
+  ports:
+    - port: {{ port }}
+      targetPort: {{ targetPort }}
+  selector:
+    name:  {{ selector_name }}
