@@ -1,4 +1,4 @@
-rm -r yaml
+rm -rf yaml
 mkdir -p yaml
 
 project=$1
@@ -7,7 +7,10 @@ worker_num=$3
 
 
 nfs_server="192.168.50.18"
-nfs_path=/home/kakaozhang/kubernetes/nfs_shared
+nfs_path=/home/kakaozhang/PycharmProjects/SirenAI
+nfs_host_path=/workspace
+py_script=k8s.train.k8s_cpu_train
+py_path=${nfs_host_path}/speech2rig/code
 
 python3 template_yaml.py nfs_tf.yaml.jinja2 "server=${nfs_server} path=${nfs_path}" yaml/nfs_tf_${project}.yaml
 kubectl create -f yaml/nfs_tf_${project}.yaml
@@ -23,7 +26,7 @@ do
     pod_image=tensorflow/tensorflow:latest-py3
     pod_index=${ps_i}
     pod_ports=$(($ps_i+ 2222))
-    pod_host_path=/workspace/
+    pod_host_path=${nfs_host_path}
     pod_name=pod-tensorflow-ps-${pod_index}
     pod_labels_name=tensorflow-ps-${pod_index}
     pod_labels_role=pod
@@ -60,7 +63,7 @@ do
     pod_image=tensorflow/tensorflow:latest-py3
     pod_index=${worker_i}
     pod_ports=$(($worker_i+ 3333))
-    pod_host_path=/workspace/
+    pod_host_path=${nfs_host_path}
     pod_name=pod-tensorflow-worker-${pod_index}
     pod_labels_name=tensorflow-worker-${pod_index}
     pod_labels_role=pod
@@ -140,12 +143,13 @@ echo 'else' >> start_tensorflow.sh
 echo 'mkdir tf_task_logs' >> start_tensorflow.sh
 echo 'fi' >> start_tensorflow.sh
 
+
 for ps_i in $(seq 1 ${ps_num})
 do
     ps_i=$(($ps_i-1))
     pod_index=${ps_i}
 
-    echo "nohup kubectl exec -it pod-tensorflow-ps-${pod_index} -- python3 ${pod_host_path}tf_test.py --ps_hosts=$host_ips --worker_hosts=$worker_ips --job_name=ps --task_index=${ps_i} > tf_task_logs/pod-tensorflow-ps-${pod_index}.logs 2>&1&" >> start_tensorflow.sh
+    echo "nohup kubectl exec -it pod-tensorflow-ps-${pod_index} --  bash -c 'cd ${py_path} && python3 -m ${py_script}  --ps_ips=$host_ips --worker_ips=$worker_ips --job_name=ps --task_id=${ps_i} --k8s_cfg=./k8s/k8s_task/cifar10/cfg/k8s_tf.cfg --agent_cfg=./k8s/k8s_task/cifar10/cfg/agent.cfg --model_cfg=./k8s/k8s_task/cifar10/cfg/model.cfg' > tf_task_logs/pod-tensorflow-ps-${pod_index}.logs 2>&1&" >> start_tensorflow.sh
 
     echo "sleep 0.5s" >> start_tensorflow.sh
    #nohup kubectl exec  pod-tensorflow-ps-${pod_index} \
@@ -165,7 +169,7 @@ do
     worker_i=$((worker_i-1))
     pod_index=${worker_i}
 
-    echo "nohup kubectl exec -it pod-tensorflow-worker-${pod_index} -- python3 ${pod_host_path}tf_test.py --ps_hosts=$host_ips --worker_hosts=$worker_ips  --job_name=worker --task_index=${worker_i} > tf_task_logs/pod-tensorflow-worker-${pod_index}.logs 2>&1&"  >> start_tensorflow.sh
+    echo "nohup kubectl exec -it pod-tensorflow-worker-${pod_index} --  bash -c 'cd ${py_path} &&  python3 -m ${py_script}  --ps_ips=$host_ips --worker_ips=$worker_ips  --job_name=worker --task_id=${worker_i}  --k8s_cfg=./k8s/k8s_task/cifar10/cfg/k8s_tf.cfg --agent_cfg=./k8s/k8s_task/cifar10/cfg/agent.cfg --model_cfg=./k8s/k8s_task/cifar10/cfg/model.cfg ' > tf_task_logs/pod-tensorflow-worker-${pod_index}.logs 2>&1&"  >> start_tensorflow.sh
 
     echo "sleep 0.5s" >> start_tensorflow.sh
     #nohup kubectl exec  pod-tensorflow-worker-${pod_index} \
