@@ -12,6 +12,8 @@ nfs_host_path=/workspace
 py_script=k8s.train.k8s_cpu_train
 py_path=${nfs_host_path}/speech2rig/code
 
+
+# config nfs pv/pvc
 python3 template_yaml.py nfs_tf.yaml.jinja2 "server=${nfs_server} path=${nfs_path}" yaml/nfs_tf_${project}.yaml
 kubectl create -f yaml/nfs_tf_${project}.yaml
 
@@ -128,7 +130,7 @@ kubectl get pvc
 #done
 
 
-# config and run ps
+# config tensorflow script
 if [ ! -f "start_tensorflow.sh" ];then
 echo ""
 else
