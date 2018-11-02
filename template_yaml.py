@@ -11,6 +11,23 @@ for argv in argvs:
     if len(argv.split("=")) == 2:
         _key = argv.split("=")[0]
         _value = argv.split("=")[1]
+
+        # int
+        try:
+            _value = int(_value)
+            argv_dict[_key] = _value
+            continue
+        except ValueError:
+            pass
+
+        # float
+        try:
+            _value = float(_value)
+            argv_dict[_key] = _value
+        except ValueError:
+            pass
+
+        # str
         argv_dict[_key] = _value
 
 
