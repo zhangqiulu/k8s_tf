@@ -39,11 +39,12 @@ do
     pod_port_name=ps
     pod_port_num=${ps_num}
     pod_gpu_num=0
+    pod_device=gpu-${pod_i}
 
     python3 template_yaml.py jinjia2/pod/pod_tf_gpu.yaml.jinja2 "name=${pod_name} \
     labels_name=${pod_labels_name} labels_role=${pod_labels_role} image=${pod_image} container_name=${pod_container_name} \
     port_num=${pod_port_num} port_base=${pod_port_base} port_name=${pod_port_name} \
-    host_path=${pod_host_path} gpu_num=${pod_gpu_num}" \
+    host_path=${pod_host_path} gpu_num=${pod_gpu_num} device=${pod_device}" \
     yaml/pod_tf_${project}_ps_${pod_i}.yaml
 
     kubectl create -f yaml/pod_tf_${project}_ps_${pod_i}.yaml
@@ -88,11 +89,12 @@ do
     pod_port_name=worker
     pod_port_num=${worker_num}
     pod_gpu_num=1
+    pod_device=gpu-${pod_i}
 
     python3 template_yaml.py jinjia2/pod/pod_tf_gpu.yaml.jinja2 "name=${pod_name} \
     labels_name=${pod_labels_name} labels_role=${pod_labels_role} image=${pod_image} container_name=${pod_container_name} \
     port_num=${pod_port_num} port_base=${pod_port_base} port_name=${pod_port_name} \
-    host_path=${pod_host_path} gpu_num=${pod_gpu_num}" \
+    host_path=${pod_host_path} gpu_num=${pod_gpu_num} device=${pod_device}" \
     yaml/pod_tf_${project}_worker_${pod_i}.yaml
 
     kubectl create -f yaml/pod_tf_${project}_worker_${pod_i}.yaml
@@ -178,7 +180,7 @@ do
     for worker_ii in $(seq 1 ${worker_num})
     do
         worker_ii=$(($worker_ii-1))
-        worker_id=$(($worker_i*$worker_pod_num+$worker_ii))
+        worker_id=$(($worker_i*$worker_num+$worker_ii))
 
         echo "nohup kubectl exec -it pod-tensorflow-worker-${worker_i} --\
         bash -c 'cd ${py_path} && python3 -m ${py_script}  --ps_ips=$host_ips --worker_ips=$worker_ips \
