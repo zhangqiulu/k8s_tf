@@ -16,14 +16,10 @@ spec:
     volumeMounts:
     - name: home-path
       mountPath: {{ host_path }}
-    resources:
-        limits:
-          nvidia.com/gpu: {{ gpu_num }}
   volumes:
   - name: home-path
     persistentVolumeClaim:
       claimName: nfs-pvc
   nodeSelector:
-    device: {{ device }}
     deviceIndex: {{ device_index }}
 ---

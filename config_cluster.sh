@@ -5,9 +5,12 @@ mkdir -p yaml
 project=$1
 ps_pod_num=$2
 ps_num=$3
-worker_pod_num=$4
-worker_num=$5
+worker_pod_num_cpu=$4
+worker_num_cpu=$5
+worker_pod_num_gpu=$6
+worker_num_gpu=$7
 
+device_num=4
 
 
 nfs_server="192.168.50.18"
@@ -29,7 +32,7 @@ worker_ips=""
 for pod_i in $(seq 1 ${ps_pod_num})
 do
     pod_i=$((pod_i-1))
-    pod_image=tensorflow/tensorflow:latest-gpu-py3
+    pod_image=tensorflow/tensorflow:latest-py3
     pod_port_base=2222
     pod_host_path=${nfs_host_path}
     pod_name=pod-tensorflow-ps-${pod_i}
@@ -38,13 +41,13 @@ do
     pod_container_name=ps
     pod_port_name=ps
     pod_port_num=${ps_num}
-    pod_gpu_num=0
-    pod_device=gpu-${pod_i}
+    pod_device=gpu
+    pod_device_index=d-$((pod_i%device_num))
 
-    python3 template_yaml.py jinjia2/pod/pod_tf_gpu.yaml.jinja2 "name=${pod_name} \
+    python3 template_yaml.py jinjia2/pod/pod_tf_cpu.yaml.jinja2 "name=${pod_name} \
     labels_name=${pod_labels_name} labels_role=${pod_labels_role} image=${pod_image} container_name=${pod_container_name} \
     port_num=${pod_port_num} port_base=${pod_port_base} port_name=${pod_port_name} \
-    host_path=${pod_host_path} gpu_num=${pod_gpu_num} device=${pod_device}" \
+    host_path=${pod_host_path} device_index=${pod_device_index}" \
     yaml/pod_tf_${project}_ps_${pod_i}.yaml
 
     kubectl create -f yaml/pod_tf_${project}_ps_${pod_i}.yaml
@@ -75,53 +78,104 @@ done
 
 echo ${host_ips}
 
-# config and run worker
-for pod_i in $(seq 1 ${worker_pod_num})
+# config and run worker cpu
+for pod_i in $(seq 1 ${worker_pod_num_cpu})
 do
     pod_i=$((pod_i-1))
-    pod_image=tensorflow/tensorflow:latest-gpu-py3
+    pod_image=tensorflow/tensorflow:latest-py3
     pod_port_base=3333
     pod_host_path=${nfs_host_path}
-    pod_name=pod-tensorflow-worker-${pod_i}
-    pod_labels_name=tensorflow-worker-${pod_i}
+    pod_name=pod-tensorflow-worker-cpu-${pod_i}
+    pod_labels_name=tensorflow-worker-cpu-${pod_i}
     pod_labels_role=pod
     pod_container_name=worker
     pod_port_name=worker
-    pod_port_num=${worker_num}
-    pod_gpu_num=1
-    pod_device=gpu-${pod_i}
+    pod_port_num=${worker_num_cpu}
+    pod_device_index=d-$((pod_i%device_num))
 
-    python3 template_yaml.py jinjia2/pod/pod_tf_gpu.yaml.jinja2 "name=${pod_name} \
+    python3 template_yaml.py jinjia2/pod/pod_tf_cpu.yaml.jinja2 "name=${pod_name} \
     labels_name=${pod_labels_name} labels_role=${pod_labels_role} image=${pod_image} container_name=${pod_container_name} \
     port_num=${pod_port_num} port_base=${pod_port_base} port_name=${pod_port_name} \
-    host_path=${pod_host_path} gpu_num=${pod_gpu_num} device=${pod_device}" \
-    yaml/pod_tf_${project}_worker_${pod_i}.yaml
+    host_path=${pod_host_path} device_index=${pod_device_index}" \
+    yaml/pod_tf_${project}_worker_cpu_${pod_i}.yaml
 
-    kubectl create -f yaml/pod_tf_${project}_worker_${pod_i}.yaml
+    kubectl create -f yaml/pod_tf_${project}_worker_cpu_${pod_i}.yaml
 
-    svc_name=svc-tensorflow-worker-${pod_i}
-    svc_labels_name=tensorflow-worker
+    svc_name=svc-tensorflow-worker-cpu-${pod_i}
+    svc_labels_name=tensorflow-worker-cpu
     svc_labels_role=svc
     svc_port_base=3333
     svc_target_port_base=${svc_port_base}
     svc_selector_name=${pod_labels_name}
-    svc_port_num=${worker_num}
+    svc_port_num=${worker_num_cpu}
     svc_port_name=worker
 
     python3 template_yaml.py jinjia2/service/service_tf.yaml.jinja2 \
     "labels_name=${svc_labels_name} labels_role=${svc_labels_role} name=${svc_name} \
     port_num=${svc_port_num} port_name=${svc_port_name} port_base=${svc_port_base} target_port_base=${svc_target_port_base} \
     selector_name=${svc_selector_name} "\
-    yaml/service_tf_${project}_worker_${pod_i}.yaml
+    yaml/service_tf_${project}_worker_cpu_${pod_i}.yaml
 
-    kubectl create -f yaml/service_tf_${project}_worker_${pod_i}.yaml
+    kubectl create -f yaml/service_tf_${project}_worker_cpu_${pod_i}.yaml
 
-    for pod_i in $(seq 1 ${worker_num})
+    for pod_i in $(seq 1 ${worker_num_cpu})
     do
         svc_port=$((svc_port_base+pod_i-1))
         worker_ips="${worker_ips},${svc_name}:${svc_port}"
     done
 done
+
+
+# config and run worker gpu
+for pod_i in $(seq 1 ${worker_pod_num_gpu})
+do
+    pod_i=$((pod_i-1))
+    pod_image=tensorflow/tensorflow:latest-gpu-py3
+    pod_port_base=3333
+    pod_host_path=${nfs_host_path}
+    pod_name=pod-tensorflow-worker-gpu-${pod_i}
+    pod_labels_name=tensorflow-worker-gpu-${pod_i}
+    pod_labels_role=pod
+    pod_container_name=worker
+    pod_port_name=worker
+    pod_port_num=${worker_num_gpu}
+    pod_gpu_num=1
+    pod_device=gpu
+    pod_device_index=d-$((pod_i%device_num))
+
+    python3 template_yaml.py jinjia2/pod/pod_tf_gpu.yaml.jinja2 "name=${pod_name} \
+    labels_name=${pod_labels_name} labels_role=${pod_labels_role} image=${pod_image} container_name=${pod_container_name} \
+    port_num=${pod_port_num} port_base=${pod_port_base} port_name=${pod_port_name} \
+    host_path=${pod_host_path} gpu_num=${pod_gpu_num} device=${pod_device} device_index=${pod_device_index}" \
+    yaml/pod_tf_${project}_worker_gpu_${pod_i}.yaml
+
+    kubectl create -f yaml/pod_tf_${project}_worker_gpu_${pod_i}.yaml
+
+    svc_name=svc-tensorflow-worker-gpu-${pod_i}
+    svc_labels_name=tensorflow-worker-gpu
+    svc_labels_role=svc
+    svc_port_base=3333
+    svc_target_port_base=${svc_port_base}
+    svc_selector_name=${pod_labels_name}
+    svc_port_num=${worker_num_gpu}
+    svc_port_name=worker
+
+    python3 template_yaml.py jinjia2/service/service_tf.yaml.jinja2 \
+    "labels_name=${svc_labels_name} labels_role=${svc_labels_role} name=${svc_name} \
+    port_num=${svc_port_num} port_name=${svc_port_name} port_base=${svc_port_base} target_port_base=${svc_target_port_base} \
+    selector_name=${svc_selector_name} "\
+    yaml/service_tf_${project}_worker_gpu_${pod_i}.yaml
+
+    kubectl create -f yaml/service_tf_${project}_worker_gpu_${pod_i}.yaml
+
+    for pod_i in $(seq 1 ${worker_num_gpu})
+    do
+        svc_port=$((svc_port_base+pod_i-1))
+        worker_ips="${worker_ips},${svc_name}:${svc_port}"
+    done
+done
+
+
 echo ${worker_ips}
 
 
@@ -174,20 +228,46 @@ done
 
 echo "sleep 2s" >> start_tensorflow.sh
 
-for worker_i in $(seq 1 ${worker_pod_num})
+worker_index=0
+
+for worker_i in $(seq 1 ${worker_pod_num_cpu})
 do
     worker_i=$((worker_i-1))
-    for worker_ii in $(seq 1 ${worker_num})
+    for worker_ii in $(seq 1 ${worker_num_cpu})
     do
         worker_ii=$(($worker_ii-1))
-        worker_id=$(($worker_i*$worker_num+$worker_ii))
+        worker_id=$(($worker_i*$worker_num_cpu+$worker_ii))
 
-        echo "nohup kubectl exec -it pod-tensorflow-worker-${worker_i} --\
+        echo "nohup kubectl exec -it pod-tensorflow-worker-cpu-${worker_i} --\
         bash -c 'cd ${py_path} && python3 -m ${py_script}  --ps_ips=$host_ips --worker_ips=$worker_ips \
-        --job_name=worker --task_id=${worker_id} \
+        --job_name=worker --task_id=${worker_index} --train_type=cpu \
         --k8s_cfg=./k8s/k8s_task/cifar10/cfg/k8s_tf.cfg \
         --agent_cfg=./k8s/k8s_task/cifar10/cfg/agent.cfg \
-        --model_cfg=./k8s/k8s_task/cifar10/cfg/model.cfg' > tf_task_logs/pod-tensorflow-worker-${worker_i}-${worker_ii}.logs 2>&1&" >> start_tensorflow.sh
+        --model_cfg=./k8s/k8s_task/cifar10/cfg/model.cfg' > tf_task_logs/pod-tensorflow-worker-cpu-${worker_i}-${worker_ii}.logs 2>&1&" >> start_tensorflow.sh
+
+        worker_index=$((worker_index+1))
+
+        echo "sleep 0.5s" >> start_tensorflow.sh
+    done
+done
+
+
+for worker_i in $(seq 1 ${worker_pod_num_gpu})
+do
+    worker_i=$((worker_i-1))
+    for worker_ii in $(seq 1 ${worker_num_gpu})
+    do
+        worker_ii=$(($worker_ii-1))
+        worker_id=$(($worker_i*$worker_num_gpu+$worker_ii))
+
+        echo "nohup kubectl exec -it pod-tensorflow-worker-gpu-${worker_i} --\
+        bash -c 'cd ${py_path} && python3 -m ${py_script}  --ps_ips=$host_ips --worker_ips=$worker_ips \
+        --job_name=worker --task_id=${worker_index} --train_type=gpu \
+        --k8s_cfg=./k8s/k8s_task/cifar10/cfg/k8s_tf.cfg \
+        --agent_cfg=./k8s/k8s_task/cifar10/cfg/agent.cfg \
+        --model_cfg=./k8s/k8s_task/cifar10/cfg/model.cfg' > tf_task_logs/pod-tensorflow-worker-gpu-${worker_i}-${worker_ii}.logs 2>&1&" >> start_tensorflow.sh
+
+        worker_index=$((worker_index+1))
 
         echo "sleep 0.5s" >> start_tensorflow.sh
     done
